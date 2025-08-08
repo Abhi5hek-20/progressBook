@@ -1,17 +1,22 @@
 {
-  "name": "progressbook-app",
+  "name": "workouttracker-mini-pjct",
   "version": "1.0.0",
-  "description": "ProgressBook - MERN Stack Workout Tracker",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "install-client": "cd client && npm install",
-    "install-server": "cd server && npm install",
-    "install-all": "npm run install-client && npm run install-server",
-    "build-client": "cd client && npm run build",
-    "start-server": "cd server && npm start",
-    "dev-client": "cd client && npm run dev",
-    "dev-server": "cd server && npm run dev"
+    "build": "npm run build --prefix server && npm run build --prefix client && npm run build --prefix client",
+    "start": "npm run start --prefix server"
   },
-  "keywords": ["workout", "tracker", "mern", "mongodb", "react"],
-  "author": "Abhishek",
-  "license": "MIT"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abhi5hek-20/WorkoutTracker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Abhi5hek-20/WorkoutTracker/issues"
+  },
+  "homepage": "https://github.com/Abhi5hek-20/WorkoutTracker#readme"
 }
