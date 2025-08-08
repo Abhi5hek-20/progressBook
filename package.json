@@ -1,0 +1,17 @@
+{
+  "name": "progressbook-app",
+  "version": "1.0.0",
+  "description": "ProgressBook - MERN Stack Workout Tracker",
+  "scripts": {
+    "install-client": "cd client && npm install",
+    "install-server": "cd server && npm install",
+    "install-all": "npm run install-client && npm run install-server",
+    "build-client": "cd client && npm run build",
+    "start-server": "cd server && npm start",
+    "dev-client": "cd client && npm run dev",
+    "dev-server": "cd server && npm run dev"
+  },
+  "keywords": ["workout", "tracker", "mern", "mongodb", "react"],
+  "author": "Abhishek",
+  "license": "MIT"
+}
