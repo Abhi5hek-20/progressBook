@@ -11,6 +11,10 @@ const WorkoutChart = () => {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
+  // Debug: Log the exercises data
+  console.log('exercisesDid:', exercisesDid);
+  console.log('exercisesDid length:', exercisesDid?.length);
+
   const handleChange = (e) => {
     setChartExercise(e.target.value);
   };
@@ -45,11 +49,17 @@ const WorkoutChart = () => {
           <option value="" disabled>
             Select an exercise
           </option>
-          {exercisesDid.map((exercise, idx) => (
-            <option key={idx} value={exercise.Exercise_name}>
-              {exercise.Exercise_name}
+          {exercisesDid && exercisesDid.length > 0 ? (
+            exercisesDid.map((exercise, idx) => (
+              <option key={idx} value={exercise.Exercise_name}>
+                {exercise.Exercise_name}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled>
+              No exercises found - Add some workouts first
             </option>
-          ))}
+          )}
         </select>
         <button
           onClick={handleShowChart}

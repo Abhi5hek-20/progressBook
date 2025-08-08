@@ -1,13 +1,17 @@
 import express from "express";
 import workoutRoutes from "./routes/workout.route.js";
 import authRoutes from "./routes/auth.route.js";
+import connectDB from "./DB/db.js";
 import dotenv from 'dotenv';
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 dotenv.config(); //loads the variables from .env file into process.env
+
+// Connect to MongoDB
+connectDB();
 
 
 app.use(express.urlencoded({ extended: true })); // For data parse (x-www-form-urlencoded)

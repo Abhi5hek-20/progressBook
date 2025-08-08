@@ -2,33 +2,46 @@ import {
   toPascalCase,
   editDate,
 } from "./utils/extraFunctions.util.js";
-import connection from "../DB/db.js";
+import User from "../models/userdb.js";
+import Workout from "../models/workout.js";
 import { v4 as uuidv4 } from "uuid";
 
 export const getData = async (req, res) => {
-  const numOfs = "SELECT COUNT(DISTINCT workout_date) AS total_sessions FROM workoutData WHERE user_id = ?";
-  const recent_workouts = "SELECT * FROM workoutData WHERE user_id = ? ORDER BY workout_date DESC, Workoutname DESC LIMIT 3";
-  const exQuery = "SELECT DISTINCT Exercise_name FROM workoutData WHERE user_id = ?";
-
   try {
     const { _id: userId } = req.user;
+    
+    // Debug: Check what workouts exist
+    const allWorkouts = await Workout.find({ user_id: userId });
+    console.log('All user workouts:', allWorkouts.length);
+    console.log('Sample workout:', allWorkouts[0]);
 
-    // Each execute returns [rows, fields]
-    const [totalSessionsResult] = await connection.execute(numOfs, [userId]);
+    // Get total unique workout dates (sessions)
+    const totalSessionsResult = await Workout.aggregate([
+      { $match: { user_id: userId } },
+      { $group: { _id: "$workout_date" } },
+      { $count: "total_sessions" }
+    ]);
     const t_sessions = totalSessionsResult[0]?.total_sessions || 0;
-    //console.log("t_sessions: ", t_sessions);
 
-    const [recentWorkouts] = await connection.execute(recent_workouts, [userId]);
-    //console.log("recentWorkouts: ", recentWorkouts);
-    const [exercisesDid] = await connection.execute(exQuery, [userId]);
-    //console.log("exercisesDid: ", exercisesDid);
+    // Get recent 3 workouts
+    const recentWorkouts = await Workout.find({ user_id: userId })
+      .sort({ workout_date: -1, Workoutname: -1 })
+      .limit(3);
+
+    // Get distinct exercise names
+    const exercisesDid = await Workout.distinct('Exercise_name', { user_id: userId });
+    
+    // Debug: Log the exercises
+    console.log('Backend - userId:', userId);
+    console.log('Backend - exercisesDid:', exercisesDid);
+    console.log('Backend - exercisesDid length:', exercisesDid.length);
 
     return res.status(200).json({
       success: true,
-      homePageData:{
+      homePageData: {
         t_sessions,
         recentWorkouts,
-        exercisesDid,
+        exercisesDid: exercisesDid.map(name => ({ Exercise_name: name })),
       }
     });
   } catch (err) {
@@ -43,11 +56,12 @@ export const getData = async (req, res) => {
 
 export const getHistory = async (req, res) => {
   const { _id: userId } = req.user;
-  let allData = "SELECT * FROM workoutData WHERE user_id = ? ORDER BY workout_date DESC";
+  
   try {
-    let [rows] = await connection.execute(allData, [userId]);
+    const workoutHistory = await Workout.find({ user_id: userId })
+      .sort({ workout_date: -1 });
 
-    if (rows.length == 0) {
+    if (workoutHistory.length === 0) {
       return res.status(200).json({
         success: true,
         message: "No workout History.!",
@@ -56,7 +70,7 @@ export const getHistory = async (req, res) => {
     } else {
       return res.status(200).json({
         success: true,
-        workoutHistory: rows,
+        workoutHistory,
       });
     }
   } catch (error) {
@@ -71,45 +85,45 @@ export const getHistory = async (req, res) => {
 export const insertData = async (req, res) => {
   let { workoutname, date, exercisename, reps, sets, max_weight } = req.body;
   const { _id: userId } = req.user;
-//   console.log(userId);
-  let q =
-    "INSERT INTO workoutData(_id,Workoutname,workout_date,Exercise_name,t_sets,reps,weight,user_id) VALUES (?,?,?,?,?,?,?,?)";
+
   try {
-            if (
-            !workoutname ||
-            !date ||
-            !exercisename ||
-            !reps ||
-            !sets ||
-            !max_weight
-            ) {
-            return res.status(400).json({
-                message: "please provide all fields..!",
-                success: false,
-            });
-            }
+    if (
+      !workoutname ||
+      !date ||
+      !exercisename ||
+      !reps ||
+      !sets ||
+      !max_weight
+    ) {
+      return res.status(400).json({
+        message: "please provide all fields..!",
+        success: false,
+      });
+    }
 
-            const rowId = uuidv4();
+    const rowId = uuidv4();
+    exercisename = toPascalCase(exercisename);
 
-            exercisename = toPascalCase(exercisename);
-            let data = [
-              rowId,
-              workoutname,
-              date,
-              exercisename,
-              sets,
-              reps,
-              max_weight,
-              userId,
-            ];
-            //console.log("Data received:", data)
-           
-            let result = await connection.execute(q, data);
-    
-            return res.status(201).json({
-                message: "successfully exercise added..!",
-                success: true,
-            });
+    console.log('Saving workout with userId:', userId);
+    console.log('Exercise name:', exercisename);
+
+    const newWorkout = new Workout({
+      _id: rowId,
+      user_id: userId,
+      Workoutname: workoutname,
+      workout_date: new Date(date),
+      Exercise_name: exercisename,
+      t_sets: sets,
+      reps: reps,
+      weight: max_weight
+    });
+
+    await newWorkout.save();
+
+    return res.status(201).json({
+      message: "successfully exercise added..!",
+      success: true,
+    });
   } catch (error) {
     console.log("Error in workout.controller - insertData: ", error);
     res.status(500).json({
@@ -121,7 +135,6 @@ export const insertData = async (req, res) => {
 
 export const editData = async (req, res) => {
   let { Workoutname, Exercise_name, t_sets, reps, _id, weight } = req.body;
-  let updateQuery = `UPDATE workoutData SET Workoutname = ?,Exercise_name = ?,t_sets = ?,reps = ?,weight = ? WHERE _id = ?`;
 
   try {
     if (
@@ -138,21 +151,19 @@ export const editData = async (req, res) => {
     }
 
     Exercise_name = toPascalCase(Exercise_name);
-    let updatedData = [
+
+    await Workout.findByIdAndUpdate(_id, {
       Workoutname,
       Exercise_name,
       t_sets,
       reps,
-      weight,
-      _id,
-    ];
-    await connection.execute(updateQuery, updatedData);
+      weight
+    });
 
-     return res.status(201)
-               .json({
-                     success: true,
-                    message: "SuccessFully Edited.!",
-                });
+    return res.status(201).json({
+      success: true,
+      message: "SuccessFully Edited.!",
+    });
   } catch (error) {
     console.log("Error in workout.controller => editData", error);
     res.status(500).json({
@@ -164,16 +175,16 @@ export const editData = async (req, res) => {
 
 export const deleteSingleRow = async (req, res) => {
   let { _id } = req.params;
-  let delQuery = "DELETE FROM workoutData WHERE _id = ?";
 
   try {
-        await connection.execute(delQuery, [_id]);
-        res.status(200)
-           .json({
-               success:true,
-               message: "successfully Deleted..!",
-            });
+    await Workout.findByIdAndDelete(_id);
+    
+    res.status(200).json({
+      success: true,
+      message: "successfully Deleted..!",
+    });
   } catch (error) {
+    console.log("Error in workout.controller - deleteSingleRow:", error);
     res.status(500).json({
       message: "Internal server Error",
       success: false,
@@ -182,51 +193,57 @@ export const deleteSingleRow = async (req, res) => {
 };
 
 export const deleteAll = async (req, res) => {
-  let q = "DELETE FROM workoutData WHERE user_id = ?";
-  try{
-      const { _id: userId } = req.user;
+  try {
+    const { _id: userId } = req.user;
 
-      await connection.execute(q, [userId]);
+    await Workout.deleteMany({ user_id: userId });
 
-        return res.status(200)
-            .json({
-                message: "SuccessFully All data deleted..!",
-                success: true,
-            });
-  }catch(error){ 
-     
-    
-    console.log("Error in workout.controller - deleteAll",error);
+    return res.status(200).json({
+      message: "SuccessFully All data deleted..!",
+      success: true,
+    });
+  } catch (error) {
+    console.log("Error in workout.controller - deleteAll", error);
     return res.status(500).json({
-          message: "Internal server error",
-          success: false,
-        });
-    }
+      message: "Internal server error",
+      success: false,
+    });
+  }
 };
 
 export const getDataForChart = async (req, res) => {
-  let q =
-    "SELECT workout_date,weight,reps FROM workoutData WHERE user_id = ? and Exercise_name = ? ORDER BY workout_date DESC LIMIT 10";
   const { _id: userId } = req.user;
   const { Exercise } = req.params;
+  
   if (!Exercise) {
-    res.status(400).json({
+    return res.status(400).json({
       message: "No exercise selected.!",
       success: false,
     });
   }
-  try{
-       const [result] = await connection.execute(q, [userId, Exercise]);
-        if(result){
-            //console.log("result: ",result)
-            let chartData = editDate(result);
-            res.status(200).json({
-              chartData:result,
-              message: "SuccessFully fetched",
-              success: true,
-            });
-        }
-  }catch(error){
-      res.status(500).json({message:"Internal Server Error..!",success:false})
+  
+  try {
+    const result = await Workout.find({
+      user_id: userId,
+      Exercise_name: Exercise
+    })
+    .select('workout_date weight reps')
+    .sort({ workout_date: -1 })
+    .limit(10);
+
+    if (result) {
+      let chartData = editDate(result);
+      res.status(200).json({
+        chartData: result,
+        message: "SuccessFully fetched",
+        success: true,
+      });
+    }
+  } catch (error) {
+    console.log("Error in workout.controller - getDataForChart:", error);
+    res.status(500).json({
+      message: "Internal Server Error..!",
+      success: false
+    });
   }
 };

@@ -1,5 +1,3 @@
-import connection from "../../DB/db.js";
-
 export const  toPascalCase = (str)=> {
     return str
         .toLowerCase()
